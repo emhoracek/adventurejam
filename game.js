@@ -16,7 +16,7 @@
 
         // image stuff from http://www.williammalone.com/articles/create-html5-canvas-javascript-sprite-animation/ 
         this.playerImage = new Image();
-        this.playerImage.src = "images/skatersprite1.png";
+        this.playerImage.src = "images/skater.png";
         this.evilTree = new Image();
         this.evilTree.src = "images/eviltree.png";
 
@@ -75,23 +75,66 @@
 
     var Player = function(game) {
         this.game = game;
-        this.size = { x: 20, y: 20 };
+        this.size = { x: 40, y: 40 };
         this.center = {x: game.center.x, y: 100};
         this.keyboarder = new Keyboarder();
         this.image = game.playerImage;
-        this.sprite = sprite ( screen, this, { w: 40, h: 40 }, 8 );
+        this.sprite = new Sprite ( this, { x: 20, y: 20 }, 8, 6 );
+        this.state = "skating";
     };
 
     Player.prototype = {
         update: function() {
 
+            /*
+            if (isDown(37)) {
+                this.state = "turning left";
+            }
+            else {
+                this.sprite.image = this.game.playerImage;
+            }*/
+
+            /*
+            // this is from http://ericleads.com/2012/12/switch-case-considered-harmful/
+            // it's a way to avoid "switch" (which is kinda hairy in js) by using a "method lookup"
+            // it's pretty cool but I dunno if I really want it.
+            function doState (state, that) {
+                var states = {
+                    "standing": function () {     
+                        that.sprite.image = that.game.evilTree; 
+                        },
+                    "skating": function () {
+                        that.sprite.image = that.game.playerImage; 
+                        },
+                    "stopping": function() {
+                        //do this 
+                        },
+                    "turning left": function() {
+                        // do this 
+                        },
+                    "turing right": function() {
+                        // do this 
+                        }
+                }
+
+                if (typeof states[state] !== "function") {
+                    throw new Error("Invalid action");
+                }
+
+                return states[state];
+            }
+
+            doState(this.state, this)();
+
+            */
+
+            this.sprite.update();
+
         },
 
         draw: function(screen) {
         
-            console.log(this.sprite);            
-            this.sprite.update;
-            this.sprite.render;
+            this.sprite.render(screen);
         
         },
 
@@ -117,6 +160,13 @@
     };
 
     RoadSegment.prototype = {
+
+        update: function () {
+
+            // ?
+        },
+
+
         draw: function(screen) {
             drawRect(screen, this, "blue");
             //drawText(screen, { x: 50, y: this.center.y }, this.slope );
@@ -133,13 +183,26 @@
         }
     };
 
-    var Decoration = function(game) {
+    var Decoration = function(game, center) {
 
         this.game = game;
         this.size = { x: 64, y: 64 } ;
         this.center = { x: game.center.x, y: game.center.y };
         this.image = game.eviltree;
-        this.sprite = sprite ( screen, eviltree );
+        this.sprite = new Sprite ( this, {x: 51, y: 58 } );
+    };
+
+    Decoration.prototype = {
+        update: function() {
+            // ?
+        },
+
+        draw: function(screen) {
+
+            this.sprite.render(screen);
+
+            drawRect (screen, this, "red");
+        }
     };
 
     var Road = function (game) {
@@ -149,9 +212,8 @@
         this.yaccel = 0;
         this.yspeed = 5;
         this.xspeed = 5;
-        this.friction = -0.05;
-        this.direction = 0;
         this.segments = [];
+        this.decorations = [];
     };
 
     Road.prototype = {
@@ -189,12 +251,12 @@
             var  new_segments = this.segments.filter(isOnScreen);
             
             if (lowesty < 550) {
-                
                 new_segments = new_segments.concat(buildRoad(this.game, 200, lowesty, this.segments[0].center.x).segments);
-
             }
 
             this.segments = new_segments;
+
+            this.decorations = new Decoration (this.game, {x: 250, y: 250}); 
             
         },
 
@@ -202,16 +264,15 @@
             for (var i = 0; i < this.segments.length; i++) {
                 this.segments[i].draw(screen);
             }
+
+            for (var i =0; i <this.decorations.length; i++) {
+                this.decorations[i].draw(screen);
+            }
         },
 
         collision: function(otherBody) {
-            
-            /*
-            if (this.slope != otherBody.tilt) {
-                this.yaccel = this.game.gravity * Math.sin( 1 - this.slope / 100);
-                console.log(this.yaccel); 
-                otherBody.tilt = this.slope;
-            }*/
+           
+            // 
 
         }
 
@@ -329,48 +390,45 @@
         screen.fillText(text, place.x, place.y);
     };
 
-    var sprite = function (screen, body, size, frames) {
-                    
-        var that = {},
-            frameIndex = 0,
-            tickCount = 0,
-            ticksPerFrame = ticksPerFrame || 0;
-            numFrames = frames || 1;
+    var Sprite = function (body, size, frames, ticksPerFrame) {
+                   
+        this.frameIndex = 0,
+        this.tickCount = 0,
+        this.ticksPerFrame = ticksPerFrame || 0;
+        this.numFrames = frames || 1;
             // so if frames is "undefined" then frames is "1"?
 
+        this.x = body.center.x;
+        this.y = body.center.y;
+        this.size = body.size;
+        this.image = body.image;
+        this.image_size = size || body.size;
+    
+    };
 
-        that.context = screen;
-        that.x = body.center.x;
-        that.y = body.center.y;
-        that.size = body.size
-        that.image = body.image;
-        that.image_size = size || body.size;
+    Sprite.prototype = {
+        update: function() {
+            this.tickCount += 1;
 
-        return that;
+            if (this.tickCount > this.ticksPerFrame) {
+                this.tickCount = 0;
 
-        that.update = function() {
-
-            tickCount += 1;
-
-            if (tickCount > ticksPerFrame) {
-
-                tickCount = 0;
-
-                if (frameIndex < numFrames - 1) {
-                frameIndex += 1;
+                if (this.frameIndex < this.numFrames - 1) {
+                    this.frameIndex += 1;
+                }
+                else if (this.frameIndex == this.numFrames - 1) {
+                    this.frameIndex = 0;
                 }
             }
-
-        };
-
-        that.render = function() {
-            that.context.drawImage (
-                    that.image,
-                    that.width * frameIndex, 0, // the x and y origin
-                    that.image_size.w, that.image_size.h,
-                    0, 0, // dest x and y origin
-                    that.size.x, that.size.y );
-        };
+        },
+        render: function(screen) {
+            screen.drawImage (
+                    this.image,
+                    this.image_size.x * this.frameIndex, 0, // where to start clipping the sprite sheet
+                    this.image_size.x, this.image_size.y, // where to stop clipping
+                    this.x, this.y, // where to place the sprite
+                    this.size.x, this.size.y ); // size of the placed sprite;
+        }
     };
 
 })();
