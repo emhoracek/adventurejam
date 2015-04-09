@@ -5,17 +5,28 @@
     var Game = function(){
         var screen = document.getElementById("screen").getContext("2d");
 
+        screen.imageSmoothingEnabled = false;
+        screen.webkitImageSmoothingEnabled = false;
+        screen.mozImageSmoothingEnabled = false;
+        
+        this.keyboarder = Keyboarder();
+
         this.size = {x: screen.canvas.width, y: screen.canvas. height};
         this.center = { x : this.size.x / 2, y: this.size.y / 2}; 
 
-        this.bodies = buildRoad(this).concat(new Player(this));
+        // image stuff from http://www.williammalone.com/articles/create-html5-canvas-javascript-sprite-animation/ 
+        this.playerImage = new Image();
+        this.playerImage.src = "images/skatersprite1.png";
+        this.evilTree = new Image();
+        this.evilTree.src = "images/eviltree.png";
+
+        this.road = buildRoad(this, this.size.y, 0, 250);
+        this.player = new Player(this);
+        this.bodies = [this.road, this.player ];
         
-        this.gravity = 0.7;
-        this.slope = 0.1;
+        this.gravity = 0.9;
         var self = this;
 
-        console.log("hello");
-        // is this preferable to "function tick()"?
         var tick = function() {
             self.update();
             self.draw(screen);
@@ -39,8 +50,7 @@
         draw: function(screen) {
             
             screen.clearRect(0, 0, this.size.x, this.size.y);
-            screen.fillStyle = "red";
-            screen.fillRect(10, 10, 10, 10);
+            
             for (var i = 0; i < this.bodies.length; i++) {
                 if (this.bodies[i].draw !== undefined) {
                     this.bodies[i].draw(screen);
@@ -65,79 +75,180 @@
 
     var Player = function(game) {
         this.game = game;
-        this.size = { x: 10, y: 10 };
-        this.center = {x: game.center.x, y: 50};
-        this.xspeed = 1;
-        this.yspeed = 1;
-        this.mass = 10;
-        this.yaccel = 0;
-        this.direction = 0;
+        this.size = { x: 20, y: 20 };
+        this.center = {x: game.center.x, y: 100};
         this.keyboarder = new Keyboarder();
+        this.image = game.playerImage;
+        this.sprite = sprite ( screen, this, { w: 40, h: 40 }, 8 );
     };
 
     Player.prototype = {
         update: function() {
-            //console.log("".concat(this.yaccel).concat(" accel, ").concat(this.yspeed));
-            if (this.direction) {
-                if (this.center.x < this.game.size.x - 10) {
-                    this.center.x += this.xspeed;
-                }
-            }
-            else {
-                if (this.center.y < this.game.size.y - 10) {
-                    this.center.y += this.yspeed;
-                }
-            }
+
         },
 
         draw: function(screen) {
-            drawRect(screen, this, "black");
+        
+            console.log(this.sprite);            
+            this.sprite.update;
+            this.sprite.render;
+        
         },
 
         collision: function(otherBody) {
 
-            var theta = otherBody.slope / 100;
+            throw "implement me";
 
-            this.yaccel = this.game.gravity * Math.sin(otherBody.slope);
-            console.log(this.yaccel);
-            this.yspeed = this.yspeed + (this.yspeed * this.yaccel);
+            if (otherBody.slope != undefined) {
+                if (this.tilt != otherBody.slope) {
+                     console.log("changing");
+                }
+                this.tilt = otherBody.slope;
+            }
 
         }
     };
 
-    var Road = function (game, slope, center) {
+    var RoadSegment = function (game, slope, center) {
         this.game = game;
         this.slope = slope;
         this.size = { x: 300, y: slope }
-        this.center = center;
+        this.center = center
+    };
+
+    RoadSegment.prototype = {
+        draw: function(screen) {
+            drawRect(screen, this, "blue");
+            //drawText(screen, { x: 50, y: this.center.y }, this.slope );
+            //drawText(screen, {x: 25, y: 50 }, this.yspeed );
+        },
+
+        collision: function(otherBody) {
+
+            if (this.slope != otherBody.tilt) {
+                this.yaccel = this.game.gravity * Math.sin( 1 - this.slope / 100);
+                console.log(this.yaccel); 
+                otherBody.tilt = this.slope;
+            }
+        }
+    };
+
+    var Decoration = function(game) {
+
+        this.game = game;
+        this.size = { x: 64, y: 64 } ;
+        this.center = { x: game.center.x, y: game.center.y };
+        this.image = game.eviltree;
+        this.sprite = sprite ( screen, eviltree );
+    };
+
+    var Road = function (game) {
+        this.game = game;
+        this.size = { x: 250, y: game.size.y } 
+        this.center = {x: game.center.x, y: game.center.y};
+        this.yaccel = 0;
+        this.yspeed = 5;
+        this.xspeed = 5;
+        this.friction = -0.05;
+        this.direction = 0;
+        this.segments = [];
     };
 
     Road.prototype = {
         update: function() {
-            // implement me!
+            
+            var lowesty = 0;
+
+            if (this.yspeed < 10) {
+                this.yspeed = this.yspeed + (this.yspeed * this.yaccel);
+            }
+            else if (this.acceleration > 10) { 
+                this.acceleration = 10;
+            }
+            
+            for (var i = 0; i < this.segments.length; i ++) {
+                
+                this.segments[i].center.y -= this.yspeed;
+
+                if (this.segments[i].center.y > lowesty) {
+                    lowesty = this.segments[i].center.y;
+                }
+
+                if (isDown(37)) {
+                    this.segments[i].center.x += this.xspeed;
+                }
+                else if (isDown(39)) {
+                    this.segments[i].center.x -= this.xspeed;
+                }
+            }
+            
+            function isOnScreen(obj) {
+                return (obj.center.y > -50);
+            }
+
+            var  new_segments = this.segments.filter(isOnScreen);
+            
+            if (lowesty < 550) {
+                
+                new_segments = new_segments.concat(buildRoad(this.game, 200, lowesty, this.segments[0].center.x).segments);
+
+            }
+
+            this.segments = new_segments;
+            
         },
 
         draw: function(screen) {
-            drawRect(screen, this, "blue");
+            for (var i = 0; i < this.segments.length; i++) {
+                this.segments[i].draw(screen);
+            }
         },
 
         collision: function(otherBody) {
-            throw "implement me"
+            
+            /*
+            if (this.slope != otherBody.tilt) {
+                this.yaccel = this.game.gravity * Math.sin( 1 - this.slope / 100);
+                console.log(this.yaccel); 
+                otherBody.tilt = this.slope;
+            }*/
+
         }
 
     };
 
-    var buildRoad = function(game) {
+    var buildRoad = function(game, road_size, ystart, x) {
 
-        var road = [];
-        //        var roadSize = game.size.y / 10;
-        var roadSize = 5
-        
-        for (var i = 0; i < roadSize; i++) {
-            var x = 250;
-            var y = i * 100;
-            var slope = Math.random() * 100;
-            road.push(new Road(game, slope, {x: x, y: y}));
+        var road = new Road(game);
+        var y = ystart;
+        var yend = y + road_size;
+
+        var curSlope = 100;
+
+        var x = x;
+
+        while (y < yend) {
+
+            var nextSlope = Math.floor(Math.random() * 100);
+            //console.log(nextSlope);
+
+            var diffSlope = nextSlope - curSlope;
+
+            while (diffSlope > 10 || diffSlope < -10) {
+                if (nextSlope > curSlope) {
+                     curSlope = Math.floor(curSlope + diffSlope / 2);
+                }
+                else {
+                    curSlope = Math.floor(curSlope + diffSlope / 2);
+                }
+                
+                y = y + Math.floor(curSlope / 2);
+                road.segments.push(new RoadSegment(game, curSlope, {x: x, y: y}));
+                y = y + Math.floor(curSlope / 2);
+                y = y + 1;
+
+                diffSlope = nextSlope - curSlope;
+            }
         }
 
         return road;
@@ -161,24 +272,19 @@
 
         this.KEYS = { LEFT: 37, RIGHT: 39, UP: 38, DOWN: 40, SPACE: 32 };
     };
-
-    var isColliding = function (b1, b2) {
-   
-          /*         console.log(b1.constructor); 
-          if (Player.prototype.isPrototypeOf(b1)) {
-              b1.collision(b2);
-          }
-          else if (Player.prototype.isPrototypeOf(b2)) {
-              b2.collision(b1);
-          }/*
-          else {
-              console.log("WHYYYYYYY");
-          }*/
     
+    var isColliding = function (b1, b2) {
+        
+        if ( b1.center.x - b1.size.x / 2 < b2.center.x + b2.size.x / 2 &&
+             b2.center.x + b2.size.x / 2 < b1.center.x + b1.size.x / 2 &&
+             b1.center.y - b1.size.y / 2 < b2.center.y + b2.size.y / 2 &&
+             b2.center.y + b2.size.y / 2 < b1.center.y + b1.size.y / 2) {
+                
+                return true;
+        }
     };
 
     var reportCollisions = function(bodies) {
-
         var bodyPairs = [];
 
         for (var i = 0; i < bodies.length; i++) {
@@ -205,7 +311,67 @@
         screen.fillRect ( body.center.x - body.size.x / 2,
                         body.center.y - body.size.y / 2,
                         body.size.x,
-                        body.size.y)
+                        body.size.y);
     };
+
+    var drawOutline = function (screen, body, color) {
+        screen.strokeStyle = color;
+        screen.rect ( body.center.x - body.size.x / 2,
+                      body.center.y - body.size.y / 2,
+                      body.size.x,
+                      body.size.y);
+        screen.stroke();
+    };
+
+    var drawText = function (screen, place, text) {
+        screen.font = "10px sans";
+        screen.fillStyle = "black";
+        screen.fillText(text, place.x, place.y);
+    };
+
+    var sprite = function (screen, body, size, frames) {
+                    
+        var that = {},
+            frameIndex = 0,
+            tickCount = 0,
+            ticksPerFrame = ticksPerFrame || 0;
+            numFrames = frames || 1;
+            // so if frames is "undefined" then frames is "1"?
+
+
+        that.context = screen;
+        that.x = body.center.x;
+        that.y = body.center.y;
+        that.size = body.size
+        that.image = body.image;
+        that.image_size = size || body.size;
+
+        return that;
+
+        that.update = function() {
+
+            tickCount += 1;
+
+            if (tickCount > ticksPerFrame) {
+
+                tickCount = 0;
+
+                if (frameIndex < numFrames - 1) {
+                frameIndex += 1;
+                }
+            }
+
+        };
+
+        that.render = function() {
+            that.context.drawImage (
+                    that.image,
+                    that.width * frameIndex, 0, // the x and y origin
+                    that.image_size.w, that.image_size.h,
+                    0, 0, // dest x and y origin
+                    that.size.x, that.size.y );
+        };
+    };
+
 })();
 
