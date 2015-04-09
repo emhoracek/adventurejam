@@ -20,7 +20,7 @@
         this.evilTree = new Image();
         this.evilTree.src = "images/eviltree.png";
 
-        this.road = buildRoad(this, this.size.y, 0, 250);
+        this.road = buildRoad(this, this.size.y, 150, 250);
         this.player = new Player(this);
         this.bodies = [this.road, this.player ];
         
@@ -80,13 +80,32 @@
         this.keyboarder = new Keyboarder();
         this.image = game.playerImage;
         this.sprite = new Sprite ( this, { x: 20, y: 20 }, 8, 6 );
-        this.state = "skating";
+        this.state = "standing";
     };
 
     Player.prototype = {
         update: function() {
 
-            /*
+            if (isDown(KEYS.DOWN)) {
+                this.state = "skating";
+            }
+            else if (isDown(KEYS.UP)) {
+                this.state = "standing";
+            }
+            else {
+                this.state = "skating";
+            }
+            /*if (this.state == "standing") {
+                this.sprite = new Sprite (this, {x: 20, y: 20}, 1 );
+            }
+            else if (this.state == "skating") {
+                this.sprite = new Sprite ( this, {x: 20, y: 20}, 8, 6);
+            }
+            else {
+                throw "oops";
+            }
+              */  
+                /*
             if (isDown(37)) {
                 this.state = "turning left";
             }
@@ -134,7 +153,7 @@
 
         draw: function(screen) {
         
-            this.sprite.render(screen);
+            this.sprite.render(screen, this.center);
         
         },
 
@@ -187,8 +206,8 @@
 
         this.game = game;
         this.size = { x: 64, y: 64 } ;
-        this.center = { x: game.center.x, y: game.center.y };
-        this.image = game.eviltree;
+        this.center = center;
+        this.image = game.evilTree;
         this.sprite = new Sprite ( this, {x: 51, y: 58 } );
     };
 
@@ -198,10 +217,7 @@
         },
 
         draw: function(screen) {
-
-            this.sprite.render(screen);
-
-            drawRect (screen, this, "red");
+            this.sprite.render(screen, this.center);
         }
     };
 
@@ -210,8 +226,9 @@
         this.size = { x: 250, y: game.size.y } 
         this.center = {x: game.center.x, y: game.center.y};
         this.yaccel = 0;
-        this.yspeed = 5;
-        this.xspeed = 5;
+        this.yspeed = 0;
+        this.xspeed = 0;
+        this.direction = "down";
         this.segments = [];
         this.decorations = [];
     };
@@ -219,29 +236,79 @@
     Road.prototype = {
         update: function() {
             
+            var maxspeed = 10;
             var lowesty = 0;
 
-            if (this.yspeed < 10) {
-                this.yspeed = this.yspeed + (this.yspeed * this.yaccel);
+            var increaseSpeed = function (currentSpeed) {
+                if (currentSpeed < maxspeed) {
+                    return currentSpeed + 0.25;
+                }
+                else {
+                    return currentSpeed;
+                }
+            };
+
+            var decreaseSpeed = function (currentSpeed) {
+                if (currentSpeed > 0) {
+                    return currentSpeed - 0.25;
+                }
+                else {
+                    return 0;
+                }
+            };
+
+            if (isDown(KEYS.DOWN)){
+                this.direction = "down";
+                this.yspeed = increaseSpeed(this.yspeed);
             }
-            else if (this.acceleration > 10) { 
-                this.acceleration = 10;
+            else if (isDown(KEYS.UP)) {
+                this.direction = "up"
+                this.yspeed = decreaseSpeed(this.yspeed);
+            }
+
+            if (isDown(37)) {
+                this.direction = "left";
+                this.xspeed = increaseSpeed(this.xspeed);
+            }
+            else if (isDown(39)) {
+                this.direction = "right";
+                this.xspeed = increaseSpeed(this.xspeed);
+            }
+            else {
+                xspeed = decreaseSpeed(this.xspeed);
             }
             
             for (var i = 0; i < this.segments.length; i ++) {
-                
+               
                 this.segments[i].center.y -= this.yspeed;
 
                 if (this.segments[i].center.y > lowesty) {
                     lowesty = this.segments[i].center.y;
                 }
 
-                if (isDown(37)) {
+                if (this.direction == "left") {
                     this.segments[i].center.x += this.xspeed;
                 }
-                else if (isDown(39)) {
+                else if (this.direction == "right") {
                     this.segments[i].center.x -= this.xspeed;
                 }
+            }
+
+            for (var i = 0; i < this.decorations.length; i++ ) {
+                
+                this.decorations[i].center.y -= this.yspeed;
+
+                if (this.direction == "left") {
+                    this.decorations[i].center.x += this.xspeed;
+                }
+                else if (this.direction == "right") {
+                    this.decorations[i].center.x -= this.xspeed;
+                }
+                /*
+                if (this.decorations[i].center.y > lowesty) {
+                    lowesty = this.decorations[i].center.y;
+                }*/
+
             }
             
             function isOnScreen(obj) {
@@ -249,14 +316,17 @@
             }
 
             var  new_segments = this.segments.filter(isOnScreen);
+            var new_decorations = this.decorations.filter(isOnScreen);
             
             if (lowesty < 550) {
                 new_segments = new_segments.concat(buildRoad(this.game, 200, lowesty, this.segments[0].center.x).segments);
+                new_decorations = new_decorations.concat(addDecorations(this.game, 1, lowesty, this.segments[0].center.x - 250));
             }
 
             this.segments = new_segments;
+            this.decorations = new_decorations;
 
-            this.decorations = new Decoration (this.game, {x: 250, y: 250}); 
+            //this.decorations = [ new Decoration (this.game, {x: 250, y: 250})]; 
             
         },
 
@@ -312,9 +382,24 @@
             }
         }
 
+
+        this.decorations = addDecorations(game, 3, 0, 25);
+
         return road;
     };
 
+    var addDecorations = function (game, num, ystart, x) {
+        
+        var decorations = [];
+        var y = ystart;
+
+        for (var i = 0; i < num; i++) {
+            y += Math.floor(Math.random() * 100);
+            decorations.push(new Decoration(game, {x: x, y: y}));
+        }
+
+        return decorations;
+    };
 
     var Keyboarder = function() {
         var keyState = {};
@@ -408,6 +493,7 @@
 
     Sprite.prototype = {
         update: function() {
+
             this.tickCount += 1;
 
             if (this.tickCount > this.ticksPerFrame) {
@@ -421,12 +507,12 @@
                 }
             }
         },
-        render: function(screen) {
+        render: function(screen, center) {
             screen.drawImage (
                     this.image,
                     this.image_size.x * this.frameIndex, 0, // where to start clipping the sprite sheet
                     this.image_size.x, this.image_size.y, // where to stop clipping
-                    this.x, this.y, // where to place the sprite
+                    center.x, center.y, // where to place the sprite
                     this.size.x, this.size.y ); // size of the placed sprite;
         }
     };
